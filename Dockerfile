@@ -1,23 +1,21 @@
-# Etapa de construcción
 FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
 
-# Al estar en la raíz, solo copiamos el pom directamente
-COPY pom.xml .
-RUN mvn dependency:go-offline
+# Copiamos TODO el contenido del repositorio al contenedor
+COPY . .
 
-# Copiamos el src de la raíz
-COPY src ./src
-RUN mvn clean package -DskipTests
+# Buscamos el pom.xml ya sea en la raiz o en la subcarpeta y compilamos
+RUN if [ -f "pom.xml" ]; then \
+      mvn clean package -DskipTests; \
+    else \
+      mvn clean package -DskipTests -f sistema_cine/pom.xml; \
+    fi
 
-# Etapa de ejecución
 FROM eclipse-temurin:21-jdk-jammy
 WORKDIR /app
 
-# El JAR se genera en /app/target/ dentro del contenedor
-COPY --from=build /app/target/*.jar app.jar
+# Buscamos el .jar en cualquier carpeta target que se haya creado
+COPY --from=build /app/**/target/*.jar app.jar
 
 EXPOSE 8080
-
-# Límite de memoria para que Render no te lo mate
 ENTRYPOINT ["java", "-Xmx300m", "-jar", "app.jar"]
